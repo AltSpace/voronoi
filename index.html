@@ -9,13 +9,15 @@
   <body>
     <div id="page">
       <script type="text/paperscript" canvas="canvas-1">
-        var voronoi =  new Voronoi();
+        var voronoi = new Voronoi();
         var sites = generateBeeHivePoints(view.size / 200, true);
         var bbox, diagram;
         var oldSize = view.size;
         var spotColor = new Color('grey');
         var mousePos = view.center;
         var selected = false;
+
+        var tile;
 
         onResize();
 
@@ -52,6 +54,7 @@
         			}
         		}
         	}
+        	
         }
 
         function removeSmallBits(path) {
@@ -104,6 +107,7 @@
         	}
         	path.scale(0.95);
         	removeSmallBits(path);
+        	//path.rasterize();
         	return path;
         }
 

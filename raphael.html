@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+    <title>Voronoy diagrams</title>
+    <script type="text/javascript" charset="utf-8" src="js/raphael.max.js"></script>
+    <script type="text/javascript" charset="utf-8" src="js/ex_path.js"></script>
+    <script type="text/javascript" charset="utf-8" src="js/voronoy.js"></script>
+    <style type="text/css" media="screen">
+      body, body * {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background-color: #000;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="page">
+      <div id="paper"></div>
+    </div>
+    <script type="text/javascript" charset="utf-8">
+      
+      (function() {
+        document.addEventListener( "DOMContentLoaded", initialize, false );
+        window.addEventListener( "resize", redraw, false );
+        window.addEventListener( "mousemove", function( e ) {
+          last_mouse_pos = { x: e.x, y: e.y };
+          sites[ sites.length - 1 ] = last_mouse_pos;
+          redraw();
+        }, false );
+      
+        var paper,
+            sites,
+            bbox,
+            voronoi,
+            paths,
+            last_mouse_pos,
+            bg_data;
+        
+        function initialize() {
+          paper = Raphael(
+            "paper",
+            window.innerWidth,
+            window.innerHeight
+          );
+          
+          addPattern( "img/vw.jpg", "template1" );
+          addPattern( "img/1.jpg", "template2" );
+          addPattern( "img/3.png", "template3" );
+          addPattern( "img/ipad_1.png", "template4" );
+          addPattern( "img/s4.jpg", "template5" );
+          addPattern( "img/w1.jpg", "template6" );
+          addPattern( "img/w3.jpg", "template7" );
+          
+          voronoi = new Voronoi();
+          
+          paths = {};
+          
+          last_mouse_pos = { x: paper.width / 2, y: paper.height / 2 };
+          bbox = {
+        		xl: 0,
+        		xr: paper.width,
+        		yt: 0,
+        		yb: paper.height
+        	};
+          sites = generateBeeHivePoints( { x: paper.width / 300, y: paper.height / 300 }, true );
+          sites.push( last_mouse_pos );
+          redraw();
+        }
+      
+        function redraw() {
+          for ( var i in paths ) {
+            paths[ i ].remove();
+            delete( paths[ i ] );
+          }
+          draw();
+        }
+      
+        var xlink = "http://www.w3.org/1999/xlink",
+        $ = function (el, attr) {
+            if (attr) {
+                if (typeof el == "string") {
+                    el = $(el);
+                }
+                for (var key in attr) if (attr.hasOwnProperty(key)) {
+                    if (key.substring(0, 6) == "xlink:") {
+                        el.setAttributeNS(xlink, key.substring(6), String(attr[key]));
+                    } else {
+                        el.setAttribute(key, String(attr[key]));
+                    }
+                }
+            } else {
+                el = Raphael._g.doc.createElementNS("http://www.w3.org/2000/svg", el);
+                el.style && (el.style.webkitTapHighlightColor = "rgba(0,0,0,0)");
+            }
+            return el;
+        }
+        
+        
+        function addPattern( img_src, id ) {
+          var canvas = paper.canvas,
+              doc = canvas.ownerDocument,
+              namespaceUri = canvas.namespaceURI,
+              defs = paper.defs,
+              el = $("pattern"),
+              ig = $("image");
+              el.id = id;
+              $(el, {x: 0, y: 0, patternUnits: "userSpaceOnUse", height: 1, width: 1});
+              $(ig, {x: 0, y: 0, "xlink:href": img_src});
+              el.appendChild(ig);
+          
+          (function (el) {
+              Raphael._preload(img_src, function () {
+                  var w = this.offsetWidth,
+                      h = this.offsetHeight;
+                  $(el, {width: w, height: h});
+                  $(ig, {width: w, height: h});
+              });
+          })(el);
+          
+          defs.appendChild( el );
+          
+          return el.id;
+        }
+      
+      
+      
+        function draw() {
+          console.log( sites );
+          var diagram = voronoi.compute(sites, bbox);
+          console.log( diagram );
+        	
+        	if (diagram) {
+        	  var current_ids = [],
+        	      last_path;
+        	  for ( ix in paths ) {
+        	    current_ids.push( parseInt( ix, 10 ) );
+        	  }
+        	  
+            for ( var i = 0, l = sites.length; i < l; i++ ) {
+              var cell = diagram.cells[ sites[i].voronoiId ],
+                  ix = current_ids.indexOf( sites[i].voronoiId );
+              if ( ix !== -1 ) {
+                current_ids.splice( ix, 1 );
+              }
+              
+              if ( cell ) {
+                var halfedges = cell.halfedges,
+                    length = halfedges.length;
+                if ( length > 2 ) {
+                  var points = [];
+                  for (var j = 0; j < length; j++) {
+                    v = halfedges[j].getEndpoint();
+                    points.push( v );
+                  }
+                  last_path = setPath( sites[i].voronoiId, points, sites[i] );
+                }
+              }
+            }
+            
+            last_path.attr( "fill", "#000" );
+            
+            if ( current_ids.length ) {
+              for ( var i in current_ids ) {
+                if ( paths[ current_ids[ i ] ] !== undefined ) {
+                  paths[ current_ids[ i ] ].remove();
+                }
+              }
+            }
+            
+          }
+          
+          for ( var i in sites ) {
+            paper.circle( sites[i].x, sites[i].y, 20 ).attr( "fill", "#FFF" );
+          }
+          
+        }
+
+        
+        function setPath( v_id, points, center ) {
+        	
+        	if ( points.length <= 2 ) {
+        	  return;
+        	}
+        	
+        	var ex_p = new ExPath(),
+        	    p1, p2, p3, p12, p23,
+        	    points_stack = points
+        	
+        	points_stack.push( points[ 0 ] );
+        	points_stack.push( points[ 1 ] );
+        	
+        	while( points_stack.length > 2 ) {
+        	  var points_set = [];
+        	  p1 = { x: Math.round( points_stack[ 0 ].x ), y: Math.round( points_stack[ 0 ].y ) };
+        	  p2 = { x: Math.round( points_stack[ 1 ].x ), y: Math.round( points_stack[ 1 ].y ) };
+        	  p3 = { x: Math.round( points_stack[ 2 ].x ), y: Math.round( points_stack[ 2 ].y ) };
+        	  p12 = { x: Math.round( ( p1.x + p2.x ) / 2 ), y: Math.round( ( p1.y + p2.y ) / 2 ) };
+        	  p23 = { x: Math.round( ( p3.x + p2.x ) / 2 ), y: Math.round( ( p3.y + p2.y ) / 2 ) };
+        	  
+        	  if ( !ex_p.isStarted() ) {
+        	    ex_p.moveTo( p12.x, p12.y );
+        	  }
+        	  ex_p.sCurveTo( p2.x, p2.y, p23.x, p23.y );
+        	  
+        	  points_stack = points_stack.slice( 1 );
+        	}
+        	
+          ex_p.close();
+          
+          var path = paper.path( ex_p.getPathDSL() );
+          path.attr( "stroke", "#FFF" );
+          path.attr( "voronoy_id", v_id );
+          path.scale( 0.95 );
+          var ix = v_id - 10;
+          if ( ix > 0 ) {
+            path.attr( "fill", "url(#template" + ix + ")" );
+          }
+          paths[ v_id ] = path;
+          
+          return path;
+        }
+
+
+
+        function generateBeeHivePoints( size, loose ) {
+        	var points = [];
+        	var col = { x: paper.width / size.x, y: paper.height / size.y };
+        	for(var i = -1; i < size.x + 1; i++) {
+        		for(var j = -1; j < size.y + 1; j++) {
+        			var point = {
+        			  x: ( i / size.x * paper.width + col.x / 2 ),
+        			  y: ( j / size.y * paper.height + col.y / 2 )
+        			}
+        			if ( j % 2 ) {
+        				point.x += col.x / 2;
+        			}
+        			if ( loose ) {
+        				point.x += col.x / 4 * ( Math.random() - 1 );
+        				point.y += col.y / 4 * ( Math.random() - 1 );
+        			}
+        			points.push( point );
+        		}
+        	}
+        	return points;
+        }
+      })();
+    </script>
+  </body>
+</html>

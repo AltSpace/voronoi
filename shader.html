@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+    <title>Voronoy diagrams</title>
+    
+    <style type="text/css" media="screen">
+      body, body * {
+        margin: 0;
+        border: 0 none;
+        padding: 0;
+      }
+    </style>
+    
+    <script type="text/javascript" charset="utf-8" src="js/three.js"></script>
+    <script type="text/javascript" charset="utf-8" src="js/voronoy.js"></script>
+    <script type="text/javascript" charset="utf-8" src="js/shader.js"></script>
+    
+    <script id="fragmentShader" type="x-shader/x-fragment">
+      #ifdef GL_ES
+      precision highp float;
+    	#endif
+    	
+    	uniform vec2 mouse;
+    	uniform vec2 resolution;
+    	uniform float radius;
+    	uniform sampler2D texture;
+    	
+    	void main( void ) {
+        // vec3 color;
+    	  vec2 pos = mul( gl_FragCoord.xy, radius );
+    	  float dist_squared = dot( mouse, pos );
+    	  if ( dist_squared <= pow(radius, 2.0) ) {
+    	    gl_FragColor = vec4( 0.5, 0.5, 0.5, 1.0 );
+    	  } else {
+    	    gl_FragColor = vec4( 1.0, 0.0, 0.0, 0.1 );
+    	  }
+    	}
+    </script>
+    
+    <script id="vertexShader" type="x-shader/x-vertex"> 
+    	varying vec2 vUv;
+
+    	void main()
+    	{
+    	  gl_Position = vec4( position, 1.0 );
+        // vUv = vec2( uv.x, 1.0 - uv.y );
+        //  = projectionMatrix * modelViewMatrix * ;
+    	}
+    </script>
+  </head>
+  <body>
+    <div id="page">
+      <div id="container"></div>
+    </div>
+  </body>
+</html>
