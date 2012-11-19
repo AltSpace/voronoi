@@ -56,7 +56,9 @@
           
           voronoi = new Voronoi();
           
-          paths = {};
+          paths = [];
+          
+          console.log( paper );
           
           last_mouse_pos = { x: paper.width / 2, y: paper.height / 2 };
           bbox = {
@@ -65,7 +67,7 @@
         		yt: 0,
         		yb: paper.height
         	};
-          sites = generateBeeHivePoints( { x: paper.width / 300, y: paper.height / 300 }, true );
+          sites = generateBeeHivePoints( { x: 4.0, y: 3.0 }, true );
           sites.push( last_mouse_pos );
           redraw();
         }
@@ -133,15 +135,18 @@
           console.log( diagram );
         	
         	if (diagram) {
+        	  
         	  var current_ids = [],
-        	      last_path;
+        	      last_path,
+        	      index = 0;
+        	  
         	  for ( ix in paths ) {
         	    current_ids.push( parseInt( ix, 10 ) );
         	  }
         	  
             for ( var i = 0, l = sites.length; i < l; i++ ) {
               var cell = diagram.cells[ sites[i].voronoiId ],
-                  ix = current_ids.indexOf( sites[i].voronoiId );
+                ix = current_ids.indexOf( sites[i].voronoiId );
               if ( ix !== -1 ) {
                 current_ids.splice( ix, 1 );
               }
@@ -155,9 +160,23 @@
                     v = halfedges[j].getEndpoint();
                     points.push( v );
                   }
-                  last_path = setPath( sites[i].voronoiId, points, sites[i] );
+                  
+                  var fill_template = "",
+                      site = sites[ i ];
+                  if (
+                    site.x > paper._left &&
+                    site.x < paper._left + paper.width &&
+                    site.y > paper._top &&
+                    site.y < paper._top + paper.height
+                  ) {
+                    fill_template = "template" + ( index++ );
+                  }
+                  
+                  last_path = setPath( fill_template, points, sites[i] );
                 }
               }
+              
+              //paper.circle( sites[i].x, sites[i].y, 20 ).attr( "fill", "#FFF" );
             }
             
             last_path.attr( "fill", "#000" );
@@ -172,14 +191,10 @@
             
           }
           
-          for ( var i in sites ) {
-            paper.circle( sites[i].x, sites[i].y, 20 ).attr( "fill", "#FFF" );
-          }
-          
         }
 
         
-        function setPath( v_id, points, center ) {
+        function setPath( fill_template, points, center ) {
         	
         	if ( points.length <= 2 ) {
         	  return;
@@ -187,7 +202,7 @@
         	
         	var ex_p = new ExPath(),
         	    p1, p2, p3, p12, p23,
-        	    points_stack = points
+        	    points_stack = points;
         	
         	points_stack.push( points[ 0 ] );
         	points_stack.push( points[ 1 ] );
@@ -212,13 +227,9 @@
           
           var path = paper.path( ex_p.getPathDSL() );
           path.attr( "stroke", "#FFF" );
-          path.attr( "voronoy_id", v_id );
           path.scale( 0.95 );
-          var ix = v_id - 10;
-          if ( ix > 0 ) {
-            path.attr( "fill", "url(#template" + ix + ")" );
-          }
-          paths[ v_id ] = path;
+          path.attr( "fill", "url(#" + fill_template + ")" );
+          paths.push( path );
           
           return path;
         }
