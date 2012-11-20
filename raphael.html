@@ -38,7 +38,8 @@
             paths,
             last_mouse_pos,
             bg_data,
-            closest_center_line;
+            closest_center_line,
+            closest_site;
         
         function initialize() {
           paper = Raphael(
@@ -130,8 +131,7 @@
         	  
         	  var current_ids = [],
         	      last_path,
-        	      index = 0,
-        	      closest_site,
+        	      index = 1,
         	      closest_distance;
         	  
         	  if ( undefined !== closest_center_line && null !== closest_center_line ) {
@@ -140,6 +140,26 @@
         	  
         	  for ( ix in paths ) {
         	    current_ids.push( parseInt( ix, 10 ) );
+        	  }
+        	  
+        	  for ( var i = 0; i < sites.length; i++ ) {
+        	    var site = sites[ i ];
+        	    if (
+                site.x > paper._left &&
+                site.x < paper._left + paper.width &&
+                site.y > paper._top &&
+                site.y < paper._top + paper.height
+              ) {
+                if ( last_mouse_pos !== null && i != ( sites.length - 1 ) ) {
+                  var pointer_distance = Math.pow( last_mouse_pos.x - site.x, 2 ) +
+                                         Math.pow( last_mouse_pos.y - site.y, 2 );
+                  if ( undefined === closest_distance ||
+                        pointer_distance < closest_distance ) {
+                    closest_distance = pointer_distance;
+                    closest_site = site;
+                  }
+                }
+              }
         	  }
         	  
             for ( var i = 0, l = sites.length; i < l; i++ ) {
@@ -151,7 +171,41 @@
               
               if ( cell ) {
                 var halfedges = cell.halfedges,
-                    length = halfedges.length;
+                    fill_template = "",
+                    site = sites[ i ];
+                if ( site === closest_site && undefined !== last_mouse_pos ) {
+                  var pointer_site = sites[ sites.length - 1 ],
+                      pointer_cell = diagram.cells[ pointer_site.voronoiId ],
+                      pointer_halfedges = pointer_cell.halfedges,
+                      halfedge_signatures = [];
+                  for ( var j in halfedges ) {
+                    halfedge_signatures.push( getEdgeSignature( halfedges[ j ] ) );
+                  }
+                  // console.log( halfedge_signatures );
+                  for ( var j in pointer_halfedges ) {
+                    var signature = getEdgeSignature( pointer_halfedges[ j ] );
+                    var match_index = halfedge_signatures.indexOf( signature );
+                    // console.log( signature );
+                    if ( match_index !== -1 ) {
+                      var add_halfedges = [];
+                      for ( var k = j - 1; k >= 0; --k ) {
+                        add_halfedges.push( pointer_halfedges[ k ] );
+                      }
+                      for ( var k = pointer_halfedges.length - 1; k >= j + 1 ; --k ) {
+                        add_halfedges.push( pointer_halfedges[ k ] );
+                      }
+                      halfedges.splice( match_index, 1 );
+                      for ( var j in add_halfedges ) {
+                        halfedges.splice( match_index, 0, add_halfedges[ j ] );
+                      }
+                      //break;
+                    }
+                  }
+                  
+                }
+                
+                var length = halfedges.length
+                    
                 if ( length > 2 ) {
                   var points = [];
                   for (var j = 0; j < length; j++) {
@@ -159,8 +213,6 @@
                     points.push( v );
                   }
                   
-                  var fill_template = "",
-                      site = sites[ i ];
                   if (
                     site.x > paper._left &&
                     site.x < paper._left + paper.width &&
@@ -168,15 +220,6 @@
                     site.y < paper._top + paper.height
                   ) {
                     fill_template = "template" + ( index++ );
-                    if ( last_mouse_pos !== null && i != l - 1 ) {
-                      var pointer_distance = Math.pow( last_mouse_pos.x - site.x, 2 ) +
-                                             Math.pow( last_mouse_pos.y - site.y, 2 );
-                      if ( undefined === closest_distance ||
-                            pointer_distance < closest_distance ) {
-                        closest_distance = pointer_distance;
-                        closest_site = site;
-                      }
-                    }
                   }
                   
                   paths[ i ] = setPath( points, sites[i], paths[ i ], fill_template );
@@ -184,22 +227,41 @@
               }
             }
             
-            if (  undefined !== closest_site &&
-                  null !== closest_site &&
-                  null !== last_mouse_pos ) {
-              var ex_connector = new ExPath();
-              ex_connector.moveTo( closest_site.x, closest_site.y );
-              ex_connector.lineTo( last_mouse_pos.x, last_mouse_pos.y );
-              closest_center_line = paper.path( ex_connector.getPathDSL() );
-              closest_center_line.attr( { "stroke": "#FFF", "stroke-width": 4 } );
-            }
+            // if (  undefined !== closest_site &&
+            //       null !== closest_site &&
+            //       null !== last_mouse_pos ) {
+            //   var ex_connector = new ExPath();
+            //   ex_connector.moveTo( closest_site.x, closest_site.y );
+            //   ex_connector.lineTo( last_mouse_pos.x, last_mouse_pos.y );
+            //   closest_center_line = paper.path( ex_connector.getPathDSL() );
+            //   closest_center_line.attr( { "stroke": "#FFF", "stroke-width": 4 } );
+            // }
             
             //last_path.attr( "fill", "#000" );
           }
         }
+        
+        function getEdgeSignature( halfedge ) {
+          var x1 = halfedge.edge.va.x,
+              y1 = halfedge.edge.va.y,
+              x2 = halfedge.edge.vb.x,
+              y2 = halfedge.edge.vb.y;
+          if ( x1 > x2 ) {
+            var c = x1;
+            x1 = x2;
+            x2 = c;
+            c = y1;
+            y1 = y2;
+            y2 = c;
+          }
+          return "" + Math.round( x1 ) + "." +
+                      Math.round( y1 ) + "." +
+                      Math.round( x2 ) + "." +
+                      Math.round( y2 );
+        }
 
         
-        function setPath( points, center, current_path, fill_template ) {
+        function setPath( points, site, current_path, fill_template ) {
         	
         	if ( points.length <= 2 ) {
         	  return;
@@ -237,8 +299,9 @@
             path.attr( "path", path_dsl );
           } else {
             path = paper.path( path_dsl );
-            path.attr( "stroke", "#FFF" );
-            path.scale( 0.95 );
+            path.attr( "stroke", "#000" );
+            path.attr( "stroke-weight", 10 );
+            //path.scale( 0.95 );
             path.attr( "fill", "url(#" + fill_template + ")" );
           }
           
