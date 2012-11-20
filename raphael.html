@@ -58,8 +58,6 @@
           
           paths = [];
           
-          console.log( paper );
-          
           last_mouse_pos = { x: paper.width / 2, y: paper.height / 2 };
           bbox = {
         		xl: 0,
@@ -73,10 +71,10 @@
         }
       
         function redraw() {
-          for ( var i in paths ) {
-            paths[ i ].remove();
-            delete( paths[ i ] );
-          }
+          // for ( var i in paths ) {
+          //   paths[ i ].remove();
+          //   delete( paths[ i ] );
+          // }
           draw();
         }
       
@@ -126,14 +124,11 @@
           
           return el.id;
         }
-      
-      
-      
+        
+        
         function draw() {
-          console.log( sites );
           var diagram = voronoi.compute(sites, bbox);
-          console.log( diagram );
-        	
+          
         	if (diagram) {
         	  
         	  var current_ids = [],
@@ -172,14 +167,12 @@
                     fill_template = "template" + ( index++ );
                   }
                   
-                  last_path = setPath( fill_template, points, sites[i] );
+                  paths[ i ] = setPath( points, sites[i], paths[ i ], fill_template );
                 }
               }
-              
-              //paper.circle( sites[i].x, sites[i].y, 20 ).attr( "fill", "#FFF" );
             }
             
-            last_path.attr( "fill", "#000" );
+            //last_path.attr( "fill", "#000" );
             
             if ( current_ids.length ) {
               for ( var i in current_ids ) {
@@ -194,7 +187,7 @@
         }
 
         
-        function setPath( fill_template, points, center ) {
+        function setPath( points, center, current_path, fill_template ) {
         	
         	if ( points.length <= 2 ) {
         	  return;
@@ -225,11 +218,17 @@
         	
           ex_p.close();
           
-          var path = paper.path( ex_p.getPathDSL() );
-          path.attr( "stroke", "#FFF" );
-          path.scale( 0.95 );
-          path.attr( "fill", "url(#" + fill_template + ")" );
-          paths.push( path );
+          var path;
+          if ( current_path !== undefined && current_path !== null ) {
+            path = current_path;
+            path.attr( "path", ex_p.getPathDSL() );
+          } else {
+            path = paper.path( ex_p.getPathDSL() );
+            //path.attr( "stroke", "#FFF" );
+            path.scale( 0.95 );
+            path.attr( "fill", "url(#" + fill_template + ")" );
+          }
+          //paths.push( path );
           
           return path;
         }
