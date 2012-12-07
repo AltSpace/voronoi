@@ -23,14 +23,8 @@
     <script type="text/javascript" charset="utf-8">
       
       (function() {
-        document.addEventListener( "DOMContentLoaded", initialize, false );
-        window.addEventListener( "resize", redraw, false );
-        window.addEventListener( "mousemove", function( e ) {
-          last_mouse_pos = { x: e.x, y: e.y };
-          sites[ sites.length - 1 ] = last_mouse_pos;
-          redraw();
-        }, false );
-      
+        
+        
         var paper,
             sites,
             bbox,
@@ -41,12 +35,40 @@
             closest_center_line,
             closest_site;
         
-        function initialize() {
+        document.addEventListener( "DOMContentLoaded", initialize, false );
+        window.addEventListener( "resize", function() {
+          resetPaper();
+          redraw();
+        }, false );
+        window.addEventListener( "mousemove", function( e ) {
+          last_mouse_pos = { x: e.x, y: e.y };
+          // sites[ sites.length - 1 ] = last_mouse_pos;
+          redraw();
+        }, false );
+      
+        function resetPaper() {
+          
           paper = Raphael(
             "paper",
             window.innerWidth,
             window.innerHeight
           );
+          
+          bbox = {
+        		xl: 0,
+        		xr: paper.width,
+        		yt: 0,
+        		yb: paper.height
+        	};
+          
+          paths = [];
+          
+          sites = generateBeeHivePoints( { x: 4.0, y: 3.0 }, true );
+        }
+        
+        function initialize() {
+          
+          resetPaper();
           
           addPattern( "img/vw.jpg", "template1" );
           addPattern( "img/1.jpg", "template2" );
@@ -63,17 +85,9 @@
           
           voronoi = new Voronoi();
           
-          paths = [];
-          
           last_mouse_pos = { x: paper.width / 2, y: paper.height / 2 };
-          bbox = {
-        		xl: 0,
-        		xr: paper.width,
-        		yt: 0,
-        		yb: paper.height
-        	};
-          sites = generateBeeHivePoints( { x: 4.0, y: 3.0 }, true );
-          sites.push( last_mouse_pos );
+          
+          // sites.push( last_mouse_pos );
           redraw();
         }
       
