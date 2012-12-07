@@ -3,6 +3,7 @@
   <head>
     <meta http-equiv="Content-type" content="text/html; charset=utf-8">
     <title>Voronoy diagrams</title>
+    <!-- Here is patched raphael version! -->
     <script type="text/javascript" charset="utf-8" src="js/raphael.max.js"></script>
     <script type="text/javascript" charset="utf-8" src="js/ex_path.js"></script>
     <script type="text/javascript" charset="utf-8" src="js/voronoy.js"></script>
@@ -33,26 +34,23 @@
             last_mouse_pos,
             bg_data,
             closest_center_line,
-            closest_site;
+            closest_site,
+            cursor_path;
         
         document.addEventListener( "DOMContentLoaded", initialize, false );
+        
         window.addEventListener( "resize", function() {
           resetPaper();
           redraw();
         }, false );
+        
         window.addEventListener( "mousemove", function( e ) {
           last_mouse_pos = { x: e.x, y: e.y };
-          // sites[ sites.length - 1 ] = last_mouse_pos;
-          redraw();
         }, false );
       
         function resetPaper() {
           
-          paper = Raphael(
-            "paper",
-            window.innerWidth,
-            window.innerHeight
-          );
+          paper.setSize( window.innerWidth, window.innerHeight );
           
           bbox = {
         		xl: 0,
@@ -61,12 +59,18 @@
         		yb: paper.height
         	};
           
-          paths = [];
-          
           sites = generateBeeHivePoints( { x: 4.0, y: 3.0 }, true );
         }
         
         function initialize() {
+          
+          paper = Raphael(
+            "paper",
+            window.innerWidth,
+            window.innerHeight
+          );
+          
+          paths = [];
           
           resetPaper();
           
@@ -87,7 +91,6 @@
           
           last_mouse_pos = { x: paper.width / 2, y: paper.height / 2 };
           
-          // sites.push( last_mouse_pos );
           redraw();
         }
       
@@ -96,6 +99,7 @@
         }
       
         var xlink = "http://www.w3.org/1999/xlink",
+        
         $ = function (el, attr) {
             if (attr) {
                 if (typeof el == "string") {
@@ -126,7 +130,7 @@
               el.id = id;
               $(el, {x: 0, y: 0, patternUnits: "userSpaceOnUse", height: 1, width: 1});
               $(ig, {x: 0, y: 0, "xlink:href": img_src});
-              el.appendChild(ig);
+              el.appendChild( ig );
           
           (function (el) {
               Raphael._preload(img_src, function () {
@@ -144,6 +148,7 @@
         
         
         function draw() {
+          
           var diagram = voronoi.compute(sites, bbox);
           
         	if (diagram) {
@@ -153,14 +158,7 @@
         	      index = 1,
         	      closest_distance;
         	  
-        	  if ( undefined !== closest_center_line && null !== closest_center_line ) {
-        	    closest_center_line.remove();
-        	  }
-        	  
-        	  for ( ix in paths ) {
-        	    current_ids.push( parseInt( ix, 10 ) );
-        	  }
-        	  
+        	  // определение ближайшей к курсору мышки ячейки
         	  for ( var i = 0; i < sites.length; i++ ) {
         	    var site = sites[ i ];
         	    if (
@@ -192,37 +190,6 @@
                 var halfedges = cell.halfedges,
                     fill_template = "",
                     site = sites[ i ];
-                if ( site === closest_site && undefined !== last_mouse_pos ) {
-                  var pointer_site = sites[ sites.length - 1 ],
-                      pointer_cell = diagram.cells[ pointer_site.voronoiId ],
-                      pointer_halfedges = pointer_cell.halfedges,
-                      halfedge_signatures = [];
-                  for ( var j in halfedges ) {
-                    halfedge_signatures.push( getEdgeSignature( halfedges[ j ] ) );
-                  }
-                  // console.log( halfedge_signatures );
-                  for ( var j in pointer_halfedges ) {
-                    var signature = getEdgeSignature( pointer_halfedges[ j ] );
-                    var match_index = halfedge_signatures.indexOf( signature );
-                    // console.log( signature );
-                    if ( match_index !== -1 ) {
-                      var add_halfedges = [];
-                      for ( var k = j - 1; k >= 0; --k ) {
-                        add_halfedges.push( pointer_halfedges[ k ] );
-                      }
-                      for ( var k = pointer_halfedges.length - 1; k >= j + 1 ; --k ) {
-                        add_halfedges.push( pointer_halfedges[ k ] );
-                      }
-                      halfedges.splice( match_index, 1 );
-                      for ( var j in add_halfedges ) {
-                        halfedges.splice( match_index, 0, add_halfedges[ j ] );
-                      }
-                      //break;
-                    }
-                  }
-                  
-                }
-                
                 var length = halfedges.length
                     
                 if ( length > 2 ) {
@@ -239,46 +206,15 @@
                     site.y < paper._top + paper.height
                   ) {
                     fill_template = "template" + ( index++ );
+                    paths[ i ] = setPath( points, sites[i], paths[ i ], fill_template );
                   }
                   
-                  paths[ i ] = setPath( points, sites[i], paths[ i ], fill_template );
+                  
                 }
               }
             }
-            
-            // if (  undefined !== closest_site &&
-            //       null !== closest_site &&
-            //       null !== last_mouse_pos ) {
-            //   var ex_connector = new ExPath();
-            //   ex_connector.moveTo( closest_site.x, closest_site.y );
-            //   ex_connector.lineTo( last_mouse_pos.x, last_mouse_pos.y );
-            //   closest_center_line = paper.path( ex_connector.getPathDSL() );
-            //   closest_center_line.attr( { "stroke": "#FFF", "stroke-width": 4 } );
-            // }
-            
-            //last_path.attr( "fill", "#000" );
           }
         }
-        
-        function getEdgeSignature( halfedge ) {
-          var x1 = halfedge.edge.va.x,
-              y1 = halfedge.edge.va.y,
-              x2 = halfedge.edge.vb.x,
-              y2 = halfedge.edge.vb.y;
-          if ( x1 > x2 ) {
-            var c = x1;
-            x1 = x2;
-            x2 = c;
-            c = y1;
-            y1 = y2;
-            y2 = c;
-          }
-          return "" + Math.round( x1 ) + "." +
-                      Math.round( y1 ) + "." +
-                      Math.round( x2 ) + "." +
-                      Math.round( y2 );
-        }
-
         
         function setPath( points, site, current_path, fill_template ) {
         	
@@ -315,12 +251,11 @@
               path_dsl = ex_p.getPathDSL();
           if ( current_path !== undefined && current_path !== null ) {
             path = current_path;
-            path.attr( "path", path_dsl );
+            path.animate( { path: path_dsl }, 600, "<>", function() {} );
           } else {
             path = paper.path( path_dsl );
             path.attr( "stroke", "#000" );
             path.attr( "stroke-width", 10 );
-            //path.scale( 0.95 );
             path.attr( "fill", "url(#" + fill_template + ")" );
           }
           
