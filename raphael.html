@@ -25,6 +25,7 @@
       
       (function() {
         
+        var CURSOR_ZONE_HEIGHT = 150;
         
         var paper,
             sites,
@@ -46,19 +47,31 @@
         
         window.addEventListener( "mousemove", function( e ) {
           last_mouse_pos = { x: e.x, y: e.y };
+          getClosestPath( last_mouse_pos );
+          redrawCursorPath( last_mouse_pos );
         }, false );
-      
+        
+        function is_empty( subj ) {
+          return subj === undefined || subj === null;
+        }
+        
+        function each( arr, cb ) {
+          console.log( arr );
+          for ( var i in arr ) {
+            ( function( ix ) {
+              cb( arr[ ix ], ix );
+            } )( i );
+          }
+        }
+        
         function resetPaper() {
-          
           paper.setSize( window.innerWidth, window.innerHeight );
-          
           bbox = {
         		xl: 0,
         		xr: paper.width,
         		yt: 0,
         		yb: paper.height
         	};
-          
           sites = generateBeeHivePoints( { x: 4.0, y: 3.0 }, true );
         }
         
@@ -146,40 +159,44 @@
           return el.id;
         }
         
+        function getClosestPath( cursor_pos ) {
+          var closest_distance;
+          // определение ближайшей к курсору мышки ячейки
+      	  for ( var i = 0; i < sites.length; i++ ) {
+      	    var site = sites[ i ];
+      	    if (
+              site.x > paper._left &&
+              site.x < paper._left + paper.width &&
+              site.y > paper._top &&
+              site.y < paper._top + paper.height
+            ) {
+              if ( cursor_pos !== null && i != ( sites.length - 1 ) ) {
+                var pointer_distance = Math.pow( cursor_pos.x - site.x, 2 ) +
+                                       Math.pow( cursor_pos.y - site.y, 2 );
+                if ( undefined === closest_distance ||
+                      pointer_distance < closest_distance ) {
+                  closest_distance = pointer_distance;
+                  closest_site = site;
+                }
+              }
+            }
+      	  }
+      	  
+      	  return closest_site;
+        }
         
         function draw() {
           
           var diagram = voronoi.compute(sites, bbox);
           
         	if (diagram) {
-        	  
         	  var current_ids = [],
         	      last_path,
-        	      index = 1,
-        	      closest_distance;
+        	      index = 1;
         	  
-        	  // определение ближайшей к курсору мышки ячейки
-        	  for ( var i = 0; i < sites.length; i++ ) {
-        	    var site = sites[ i ];
-        	    if (
-                site.x > paper._left &&
-                site.x < paper._left + paper.width &&
-                site.y > paper._top &&
-                site.y < paper._top + paper.height
-              ) {
-                if ( last_mouse_pos !== null && i != ( sites.length - 1 ) ) {
-                  var pointer_distance = Math.pow( last_mouse_pos.x - site.x, 2 ) +
-                                         Math.pow( last_mouse_pos.y - site.y, 2 );
-                  if ( undefined === closest_distance ||
-                        pointer_distance < closest_distance ) {
-                    closest_distance = pointer_distance;
-                    closest_site = site;
-                  }
-                }
-              }
-        	  }
+        	  getClosestPath( last_mouse_pos );
         	  
-            for ( var i = 0, l = sites.length; i < l; i++ ) {
+        	  for ( var i = 0, l = sites.length; i < l; i++ ) {
               var cell = diagram.cells[ sites[i].voronoiId ],
                 ix = current_ids.indexOf( sites[i].voronoiId );
               if ( ix !== -1 ) {
@@ -206,14 +223,77 @@
                     site.y < paper._top + paper.height
                   ) {
                     fill_template = "template" + ( index++ );
-                    paths[ i ] = setPath( points, sites[i], paths[ i ], fill_template );
+                    var path = setPath( points, sites[i], paths[ i ], fill_template );
+                    paths[ i ] = path;
+                    site.path = path;
+                    site.points = points;
                   }
-                  
-                  
                 }
               }
             }
           }
+        }
+        
+        function redrawCursorPath( mouse_pos ) {
+          
+          var closest_path = closest_site.path.attr( 'path' );
+          
+          if ( is_empty( closest_site ) ) {
+            return;
+          }
+          
+          if ( is_empty( cursor_path ) ) {
+            cursor_path = paper.path();
+          }
+          
+          var left_x = paper._left,
+              right_x = paper._left + paper.width,
+              y = mouse_pos.y,
+              top_y = y - CURSOR_ZONE_HEIGHT / 2,
+              bottom_y = y + CURSOR_ZONE_HEIGHT / 2;
+          
+          var top_line_path = (new ExPath()).moveTo( left_x, top_y ).lineTo( right_x, top_y ).getPathDSL(),
+              bottom_line_path = (new ExPath()).moveTo( left_x, bottom_y ).lineTo( right_x, bottom_y ).getPathDSL(),
+              top_intersections = Raphael.pathIntersection(
+                top_line_path,
+                closest_path
+              ),
+              bottom_intersections = Raphael.pathIntersection(
+                bottom_line_path,
+                closest_path
+              );
+          
+          var point_set = [];
+          
+          each( closest_site.points, function( point ) {
+            if ( point.y >= top_y && point.y <= bottom_y ) {
+              point_set.push( { x: point.x, y: point.y } );
+            }
+          } );
+          
+          each( top_intersections.concat( bottom_intersections ), function( point ) {
+            point_set.push( { x: point.x, y: point.y } );
+          } );
+          
+          var cursor_expath = new ExPath();
+              // points = top_intersections.concat( bottom_intersections );
+          
+          each( point_set, function( point ) {
+            if ( !cursor_expath.isStarted() ) {
+              cursor_expath.moveTo(
+                Math.round( point.x ),
+                Math.round( point.y )
+              );
+            } else {
+              cursor_expath.lineTo(
+                Math.round( point.x ),
+                Math.round( point.y )
+              );
+            }
+          } );
+          cursor_expath.close();
+          
+          cursor_path.attr( { path: cursor_expath.getPathDSL() } );
         }
         
         function setPath( points, site, current_path, fill_template ) {
