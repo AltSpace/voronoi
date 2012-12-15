@@ -64,7 +64,9 @@
         }, false );
         
         window.addEventListener( "mousemove", function( e ) {
-          last_mouse_pos = { x: e.x, y: e.y };
+          var x = e.x || e.clientX,
+              y = e.y || e.clientY;
+          last_mouse_pos = { x: x, y: y };
           getClosestPath( last_mouse_pos );
           redrawCursorPath( last_mouse_pos );
         }, false );
@@ -266,7 +268,7 @@
             polars.push( { angle: angle, point: point } );
           } );
           
-          polars.sort( function( p1, p2 ) { return p1.angle > p2.angle } );
+          polars.sort( function( p1, p2 ) { return p1.angle - p2.angle } );
           
           each( polars, function( polar ) {
             // REMOVE ME
@@ -274,6 +276,8 @@
             // END OF REMOVE ME
             res.push( polar.point );
           } );
+          
+          console.log( res );
           
           return res;
         }
