@@ -242,7 +242,6 @@
           each( points, function( point ) {
             var vector = { x: relate_to.x - point.x, y: relate_to.y - point.y };
             angle = decartToAngle( vector );
-            console.log( angle );
             polars.push( { angle: angle, point: point } );
           } );
           
@@ -316,7 +315,8 @@
               ix = 0;
           
           each( closest_site.points, function( point ) {
-            if ( point.y >= top_y && point.y <= bottom_y ) {
+            if ( ( point.y >= top_y || !top_intersections.length ) &&
+              ( point.y <= bottom_y || !bottom_intersections.length ) ) {
               point_set.push( { x: point.x, y: point.y } );
             } else if ( ( point.y < top_y ) && is_empty( insert_top_after ) ) {
               insert_top_after = ix + 1;
@@ -332,7 +332,6 @@
           var cursor_expath = new ExPath();
           
           point_set = sortPoints( point_set, { x: closest_site.x, y: closest_site.y } );
-          
           
           if ( !is_empty( debug_points ) ) {
             debug_points.remove();
