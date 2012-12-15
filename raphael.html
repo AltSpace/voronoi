@@ -26,7 +26,8 @@
       (function() {
         
         var CURSOR_ZONE_HEIGHT = 120,
-            CURSOR_ZONE_ERROR = 5;
+            CURSOR_ZONE_ERROR = 5,
+            IS_DEBUG = false;
         
         var paper,
             sites,
@@ -271,13 +272,8 @@
           polars.sort( function( p1, p2 ) { return p1.angle - p2.angle } );
           
           each( polars, function( polar ) {
-            // REMOVE ME
-            polar.point.angle = polar.angle;
-            // END OF REMOVE ME
             res.push( polar.point );
           } );
-          
-          console.log( res );
           
           return res;
         }
@@ -369,31 +365,54 @@
           var top_path_bbox, bottom_path_bbox,
               top_path_dsl = "", bottom_path_dsl = "";
           
+          
+          if ( IS_DEBUG ) {
+            if ( !is_empty( debug_points ) ) {
+              debug_points.remove();
+              debug_points = null;
+            }
+            debug_points = paper.set();
+            var ix = 0;
+            each( bottom_path_points, function( point ) {
+              debug_points.push(
+                paper.circle( point.x, point.y, 10 ).attr( { fill: "#00F" } ).toFront(),
+                paper.text( point.x, point.y, "" + ix++ )
+              );
+            } );
+            each( top_path_points, function( point ) {
+              debug_points.push(
+                paper.circle( point.x, point.y, 10 ).attr( { fill: "#0F0" } ).toFront(),
+                paper.text( point.x, point.y, "" + ix++ )
+              );
+            } )
+          }
+          
+          
           if ( top_path_points.length > 2 )
             top_path_bbox = Raphael.pathBBox( ExPath.Util.roundabout( top_path_points ).getPathDSL() );
           if ( bottom_path_points.length > 2 )
             bottom_path_bbox = Raphael.pathBBox( ExPath.Util.roundabout( bottom_path_points ).getPathDSL() );
           
           if ( ( top_path_points.length > 2 ) && !is_empty( top_path_bbox ) ) {
-            top_path_points = sortPoints(
+            top_path_points = rejectShortDist( sortPoints(
               top_path_points,
               { x: top_path_bbox.x + top_path_bbox.width / 2, y: top_path_bbox.y + top_path_bbox.height / 2 }
-            );
+            ), 2 );
             top_path_dsl = ExPath.Util.roundaboutMiddle( top_path_points ).getPathDSL();
           }
           top_sub_path.attr( { path: top_path_dsl, fill: "url(#" + closest_site.fill_template + ")" } ).toFront();
           
           if ( ( bottom_path_points.length > 2 ) && !is_empty( bottom_path_bbox ) ) {
-            bottom_path_points = sortPoints(
+            bottom_path_points = rejectShortDist( sortPoints(
               bottom_path_points,
               { x: bottom_path_bbox.x + bottom_path_bbox.width / 2, y: bottom_path_bbox.y + bottom_path_bbox.height / 2 }
-            );
+            ), 2 );
             bottom_path_dsl = ExPath.Util.roundaboutMiddle( bottom_path_points ).getPathDSL();
           }
           
           bottom_sub_path.attr( { path: bottom_path_dsl, fill: "url(#" + closest_site.fill_template + ")" } ).toFront();
           
-          point_set = sortPoints( point_set, { x: closest_site.x, y: closest_site.y } );
+          point_set = rejectShortDist( sortPoints( point_set, { x: closest_site.x, y: closest_site.y } ), 5 );
           
           each( point_set, function( point ) {
             if ( !cursor_expath.isStarted() ) {
@@ -417,7 +436,7 @@
               bbox;
           if ( !is_empty( closest_site.signature ) ) {
             signature = closest_site.signature;
-            bbox = Raphael.pathBBox( cursor_expath.getPathDSL() ); //cursor_path.getBBox();
+            bbox = Raphael.pathBBox( cursor_expath.getPathDSL() );
             pos = { x: bbox.x + bbox.width / 2, y: bbox.y + bbox.height / 2 };
           } else {
             signature = "";
@@ -425,6 +444,30 @@
           }
           
           cursor_path_text.attr( { text: signature, x: pos.x, y: pos.y } );
+        }
+        
+        function rejectShortDist( sorted_points, min_dist ) {
+          
+          var res = [],
+              prev_point,
+              sqMinDist = Math.pow( min_dist, 2 );
+          
+          each( sorted_points, function( point ) {
+            if ( !is_empty( prev_point ) ) {
+              if ( sqMinDist <= sqDistanceBetween( point, prev_point ) ) {
+                res.push( point );
+              }
+            } else {
+              res.push( point );
+            }
+            prev_point = point;
+          } );
+          
+          return res;
+        }
+        
+        function sqDistanceBetween( p1, p2 ) {
+          return Math.pow( p1.x - p2.x, 2 ) + Math.pow( p1.y - p2.y, 2 );
         }
         
         function setPath( points, site, current_path, fill_template ) {
