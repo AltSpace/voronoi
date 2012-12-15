@@ -36,7 +36,22 @@
             bg_data,
             closest_center_line,
             closest_site,
-            cursor_path;
+            cursor_path,
+            cursor_path_text,
+            signatures = [
+              "A fool thinks himself to be wise,\nbut a wise man knows himself\nto be a fool",
+              "Be not afraid of greatness:\nsome are born great,\nsome achieve greatness, and some\nhave greatness thrust upon them.",
+              "Love all, trust a few,\ndo wrong to none.",
+              "Expectation is the root\nof all heartache.",
+              "It is not in the stars to hold\nour destiny but in ourselves.",
+              "If music be the food of love,\nplay on.",
+              "Hell is empty and all\nthe devils are here.",
+              "Better a witty fool\nthan a foolish wit.",
+              "The evil that men do lives after them;\nthe good is oft interred with their bones.",
+              "The wheel is come full circle.",
+              "It is not in the stars to hold\nour destiny but in ourselves.",
+              "God has given you one face,\nand you make yourself another."
+            ];
         
         document.addEventListener( "DOMContentLoaded", initialize, false );
         
@@ -109,7 +124,7 @@
         function redraw() {
           draw();
         }
-      
+        
         var xlink = "http://www.w3.org/1999/xlink",
         
         $ = function (el, attr) {
@@ -193,8 +208,6 @@
         	      last_path,
         	      index = 1;
         	  
-        	  getClosestPath( last_mouse_pos );
-        	  
         	  for ( var i = 0, l = sites.length; i < l; i++ ) {
               var cell = diagram.cells[ sites[i].voronoiId ],
                 ix = current_ids.indexOf( sites[i].voronoiId );
@@ -221,15 +234,19 @@
                     site.y > paper._top &&
                     site.y < paper._top + paper.height
                   ) {
-                    fill_template = "template" + ( index++ );
+                    fill_template = "template" + ( index );
                     var path = setPath( points, sites[i], paths[ i ], fill_template );
                     paths[ i ] = path;
                     site.path = path;
                     site.points = points;
+                    site.signature = signatures[ index - 1 ];
+                    index++;
                   }
                 }
               }
             }
+            getClosestPath( last_mouse_pos );
+            redrawCursorPath( last_mouse_pos );
           }
         }
         
@@ -249,7 +266,7 @@
           
           each( polars, function( polar ) {
             // REMOVE ME
-            polar.point.angle = polar.angle;
+            // polar.point.angle = polar.angle;
             // END OF REMOVE ME
             res.push( polar.point );
           } );
@@ -282,7 +299,11 @@
           
           if ( is_empty( cursor_path ) ) {
             cursor_path = paper.path();
-            cursor_path.attr( { fill: "#000000" } );
+            cursor_path.attr( { fill: "#000", stroke: "#000", "stroke-width": 10 } );
+          }
+          
+          if ( is_empty( cursor_path_text ) ) {
+            cursor_path_text = paper.text( 0, 0, "" ).attr( { fill: "#FFF", "font-size": 16 } );
           }
           
           var left_x = paper._left,
@@ -309,21 +330,13 @@
               } );
           
           // counter clockwise iterator
-          var point_set = [],
-              insert_top_after,
-              insert_bottom_after,
-              ix = 0;
+          var point_set = [];
           
           each( closest_site.points, function( point ) {
             if ( ( point.y >= top_y || !top_intersections.length ) &&
               ( point.y <= bottom_y || !bottom_intersections.length ) ) {
               point_set.push( { x: point.x, y: point.y } );
-            } else if ( ( point.y < top_y ) && is_empty( insert_top_after ) ) {
-              insert_top_after = ix + 1;
-            } else if ( ( point.y > top_y ) && is_empty( insert_bottom_after ) ) {
-              insert_bottom_after = ix + 1;
             }
-            ix++;
           } );
           
           point_set = point_set.concat( top_intersections );
@@ -340,18 +353,18 @@
           debug_points = paper.set();
           
           // REMOVE ME
-          var ix = 0;
-          each( point_set, function( point ) {
-            debug_points.push(
-              paper.circle( point.x, point.y, 10 ).attr( { fill: "#F00" } ),
-              paper.text(
-                point.x - 20,
-                point.y - 20,
-                ix + ": " + Math.round( point.angle * 180 / Math.PI )
-              ).attr( { fill: "#FFF" } )
-            );
-            ix++;
-          } );
+          // var ix = 0;
+          // each( point_set, function( point ) {
+          //   debug_points.push(
+          //     paper.circle( point.x, point.y, 10 ).attr( { fill: "#F00" } ),
+          //     paper.text(
+          //       point.x - 20,
+          //       point.y - 20,
+          //       ix + ": " + Math.round( point.angle * 180 / Math.PI )
+          //     ).attr( { fill: "#FFF" } )
+          //   );
+          //   ix++;
+          // } );
           // END OF REMOVE ME
           
           
@@ -371,6 +384,20 @@
           cursor_expath.close();
           
           cursor_path.attr( { path: cursor_expath.getPathDSL() } );
+          
+          var signature,
+              pos,
+              bbox;
+          if ( !is_empty( closest_site.signature ) ) {
+            signature = closest_site.signature;
+            bbox = cursor_path.getBBox();
+            pos = { x: bbox.x + bbox.width / 2, y: bbox.y + bbox.height / 2 };
+          } else {
+            signature = "";
+            pos = { x: 0, y: 0 };
+          }
+          
+          cursor_path_text.attr( { text: signature, x: pos.x, y: pos.y } );
         }
         
         function setPath( points, site, current_path, fill_template ) {
