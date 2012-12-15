@@ -56,7 +56,6 @@
         }
         
         function each( arr, cb ) {
-          console.log( arr );
           for ( var i in arr ) {
             ( function( ix ) {
               cb( arr[ ix ], ix );
@@ -234,6 +233,46 @@
           }
         }
         
+        function sortPoints( points, relate_to ) {
+          // просчитываем углы для каждой точки
+          // относительно центра зоны
+          // сортируем по углу наклона
+          var polars = [],
+              res = [];
+          each( points, function( point ) {
+            var vector = { x: relate_to.x - point.x, y: relate_to.y - point.y };
+            angle = decartToAngle( vector );
+            console.log( angle );
+            polars.push( { angle: angle, point: point } );
+          } );
+          
+          polars.sort( function( p1, p2 ) { return p1.angle > p2.angle } );
+          
+          each( polars, function( polar ) {
+            // REMOVE ME
+            polar.point.angle = polar.angle;
+            // END OF REMOVE ME
+            res.push( polar.point );
+          } );
+          
+          return res;
+        }
+        
+        function decartToAngle( vector ) {
+          var x = vector.x,
+              y = vector.y,
+              pi = Math.PI;
+          if ( x == 0 ) {
+            return ( y > 0 ) ? pi / 2 : -1 * pi / 2;
+          }
+          var atg = Math.atan( y / x );
+          atg += ( x > 0 ) ? ( ( y > 0 ) ? 0 : 2 * pi ) : pi;
+          
+          return atg;
+        }
+        
+        var debug_points;
+        
         function redrawCursorPath( mouse_pos ) {
           
           var closest_path = closest_site.path.attr( 'path' );
@@ -244,6 +283,7 @@
           
           if ( is_empty( cursor_path ) ) {
             cursor_path = paper.path();
+            cursor_path.attr( { fill: "#000000" } );
           }
           
           var left_x = paper._left,
@@ -262,21 +302,59 @@
                 bottom_line_path,
                 closest_path
               );
+              top_intersections.sort( function( p1, p2 ) {
+                return p1.x < p2.x;
+              } );
+              bottom_intersections.sort( function( p1, p2 ) {
+                return p1.x > p2.x;
+              } );
           
-          var point_set = [];
+          // counter clockwise iterator
+          var point_set = [],
+              insert_top_after,
+              insert_bottom_after,
+              ix = 0;
           
           each( closest_site.points, function( point ) {
             if ( point.y >= top_y && point.y <= bottom_y ) {
               point_set.push( { x: point.x, y: point.y } );
+            } else if ( ( point.y < top_y ) && is_empty( insert_top_after ) ) {
+              insert_top_after = ix + 1;
+            } else if ( ( point.y > top_y ) && is_empty( insert_bottom_after ) ) {
+              insert_bottom_after = ix + 1;
             }
+            ix++;
           } );
           
-          each( top_intersections.concat( bottom_intersections ), function( point ) {
-            point_set.push( { x: point.x, y: point.y } );
-          } );
+          point_set = point_set.concat( top_intersections );
+          point_set = point_set.concat( bottom_intersections );
           
           var cursor_expath = new ExPath();
-              // points = top_intersections.concat( bottom_intersections );
+          
+          point_set = sortPoints( point_set, { x: closest_site.x, y: closest_site.y } );
+          
+          
+          if ( !is_empty( debug_points ) ) {
+            debug_points.remove();
+            debug_points = null;
+          }
+          debug_points = paper.set();
+          
+          // REMOVE ME
+          var ix = 0;
+          each( point_set, function( point ) {
+            debug_points.push(
+              paper.circle( point.x, point.y, 10 ).attr( { fill: "#F00" } ),
+              paper.text(
+                point.x - 20,
+                point.y - 20,
+                ix + ": " + Math.round( point.angle * 180 / Math.PI )
+              ).attr( { fill: "#FFF" } )
+            );
+            ix++;
+          } );
+          // END OF REMOVE ME
+          
           
           each( point_set, function( point ) {
             if ( !cursor_expath.isStarted() ) {
