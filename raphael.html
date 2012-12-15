@@ -25,7 +25,8 @@
       
       (function() {
         
-        var CURSOR_ZONE_HEIGHT = 150;
+        var CURSOR_ZONE_HEIGHT = 120,
+            CURSOR_ZONE_ERROR = 5;
         
         var paper,
             sites,
@@ -38,6 +39,8 @@
             closest_site,
             cursor_path,
             cursor_path_text,
+            top_sub_path,
+            bottom_sub_path,
             signatures = [
               "A fool thinks himself to be wise,\nbut a wise man knows himself\nto be a fool",
               "Be not afraid of greatness:\nsome are born great,\nsome achieve greatness, and some\nhave greatness thrust upon them.",
@@ -240,6 +243,7 @@
                     site.path = path;
                     site.points = points;
                     site.signature = signatures[ index - 1 ];
+                    site.fill_template = fill_template;
                     index++;
                   }
                 }
@@ -266,7 +270,7 @@
           
           each( polars, function( polar ) {
             // REMOVE ME
-            // polar.point.angle = polar.angle;
+            polar.point.angle = polar.angle;
             // END OF REMOVE ME
             res.push( polar.point );
           } );
@@ -322,51 +326,70 @@
                 bottom_line_path,
                 closest_path
               );
-              top_intersections.sort( function( p1, p2 ) {
-                return p1.x < p2.x;
-              } );
-              bottom_intersections.sort( function( p1, p2 ) {
-                return p1.x > p2.x;
-              } );
           
           // counter clockwise iterator
-          var point_set = [];
+          var point_set = [],
+              point_set_external = closest_site.points;
           
           each( closest_site.points, function( point ) {
-            if ( ( point.y >= top_y || !top_intersections.length ) &&
-              ( point.y <= bottom_y || !bottom_intersections.length ) ) {
+            if ( ( point.y >= top_y - CURSOR_ZONE_ERROR || !top_intersections.length ) &&
+              ( point.y <= bottom_y + CURSOR_ZONE_ERROR || !bottom_intersections.length ) ) {
               point_set.push( { x: point.x, y: point.y } );
             }
           } );
           
-          point_set = point_set.concat( top_intersections );
-          point_set = point_set.concat( bottom_intersections );
+          point_set = point_set.concat( top_intersections ).concat( bottom_intersections );
+          
+          point_set_external = point_set_external.concat( top_intersections ).concat( bottom_intersections );
           
           var cursor_expath = new ExPath();
           
-          point_set = sortPoints( point_set, { x: closest_site.x, y: closest_site.y } );
-          
-          if ( !is_empty( debug_points ) ) {
-            debug_points.remove();
-            debug_points = null;
+          if ( is_empty( top_sub_path ) ) {
+            top_sub_path = paper.path().attr( { fill: "#FFF", stroke: "#000", "stroke-width": 10 } );
           }
-          debug_points = paper.set();
+          if ( is_empty( bottom_sub_path ) ) {
+            bottom_sub_path = paper.path().attr( { fill: "#FFF", stroke: "#000", "stroke-width": 10 } );
+          }
           
-          // REMOVE ME
-          // var ix = 0;
-          // each( point_set, function( point ) {
-          //   debug_points.push(
-          //     paper.circle( point.x, point.y, 10 ).attr( { fill: "#F00" } ),
-          //     paper.text(
-          //       point.x - 20,
-          //       point.y - 20,
-          //       ix + ": " + Math.round( point.angle * 180 / Math.PI )
-          //     ).attr( { fill: "#FFF" } )
-          //   );
-          //   ix++;
-          // } );
-          // END OF REMOVE ME
+          var top_path_points = [],
+              bottom_path_points = [];
           
+          each( point_set_external, function( point ) {
+            if ( point.y <= top_y + CURSOR_ZONE_ERROR ) {
+              top_path_points.push( { x: point.x, y: point.y } );
+            } else if ( point.y >= bottom_y - CURSOR_ZONE_ERROR ) {
+              bottom_path_points.push( { x: point.x, y: point.y } );
+            }
+          } );
+          
+          var top_path_bbox, bottom_path_bbox,
+              top_path_dsl = "", bottom_path_dsl = "";
+          
+          if ( top_path_points.length > 2 )
+            top_path_bbox = Raphael.pathBBox( ExPath.Util.roundabout( top_path_points ).getPathDSL() );
+          if ( bottom_path_points.length > 2 )
+            bottom_path_bbox = Raphael.pathBBox( ExPath.Util.roundabout( bottom_path_points ).getPathDSL() );
+          
+          if ( ( top_path_points.length > 2 ) && !is_empty( top_path_bbox ) ) {
+            top_path_points = sortPoints(
+              top_path_points,
+              { x: top_path_bbox.x + top_path_bbox.width / 2, y: top_path_bbox.y + top_path_bbox.height / 2 }
+            );
+            top_path_dsl = ExPath.Util.roundaboutMiddle( top_path_points ).getPathDSL();
+          }
+          top_sub_path.attr( { path: top_path_dsl, fill: "url(#" + closest_site.fill_template + ")" } ).toFront();
+          
+          if ( ( bottom_path_points.length > 2 ) && !is_empty( bottom_path_bbox ) ) {
+            bottom_path_points = sortPoints(
+              bottom_path_points,
+              { x: bottom_path_bbox.x + bottom_path_bbox.width / 2, y: bottom_path_bbox.y + bottom_path_bbox.height / 2 }
+            );
+            bottom_path_dsl = ExPath.Util.roundaboutMiddle( bottom_path_points ).getPathDSL();
+          }
+          
+          bottom_sub_path.attr( { path: bottom_path_dsl, fill: "url(#" + closest_site.fill_template + ")" } ).toFront();
+          
+          point_set = sortPoints( point_set, { x: closest_site.x, y: closest_site.y } );
           
           each( point_set, function( point ) {
             if ( !cursor_expath.isStarted() ) {
@@ -383,14 +406,14 @@
           } );
           cursor_expath.close();
           
-          cursor_path.attr( { path: cursor_expath.getPathDSL() } );
+          cursor_path.attr( { path: closest_site.path.attr( "path" ) } );
           
           var signature,
               pos,
               bbox;
           if ( !is_empty( closest_site.signature ) ) {
             signature = closest_site.signature;
-            bbox = cursor_path.getBBox();
+            bbox = Raphael.pathBBox( cursor_expath.getPathDSL() ); //cursor_path.getBBox();
             pos = { x: bbox.x + bbox.width / 2, y: bbox.y + bbox.height / 2 };
           } else {
             signature = "";
@@ -402,37 +425,16 @@
         
         function setPath( points, site, current_path, fill_template ) {
         	
-        	if ( points.length <= 2 ) {
-        	  return;
-        	}
-        	
-        	var ex_p = new ExPath(),
-        	    p1, p2, p3, p12, p23,
-        	    points_stack = points;
-        	
-        	points_stack.push( points[ 0 ] );
-        	points_stack.push( points[ 1 ] );
-        	
-        	while( points_stack.length > 2 ) {
-        	  var points_set = [];
-        	  p1 = { x: Math.round( points_stack[ 0 ].x ), y: Math.round( points_stack[ 0 ].y ) };
-        	  p2 = { x: Math.round( points_stack[ 1 ].x ), y: Math.round( points_stack[ 1 ].y ) };
-        	  p3 = { x: Math.round( points_stack[ 2 ].x ), y: Math.round( points_stack[ 2 ].y ) };
-        	  p12 = { x: Math.round( ( p1.x + p2.x ) / 2 ), y: Math.round( ( p1.y + p2.y ) / 2 ) };
-        	  p23 = { x: Math.round( ( p3.x + p2.x ) / 2 ), y: Math.round( ( p3.y + p2.y ) / 2 ) };
-        	  
-        	  if ( !ex_p.isStarted() ) {
-        	    ex_p.moveTo( p12.x, p12.y );
-        	  }
-        	  ex_p.sCurveTo( p2.x, p2.y, p23.x, p23.y );
-        	  
-        	  points_stack = points_stack.slice( 1 );
-        	}
-        	
-          ex_p.close();
+        	var path,
+        	    ex_p = ExPath.Util.roundaboutMiddle( points ),
+              path_dsl;
           
-          var path,
-              path_dsl = ex_p.getPathDSL();
+          if ( is_empty( ex_p ) ) {
+            return;
+          }
+          
+          path_dsl = ex_p.getPathDSL();
+          
           if ( current_path !== undefined && current_path !== null ) {
             path = current_path;
             path.animate( { path: path_dsl }, 600, "<>", function() {} );

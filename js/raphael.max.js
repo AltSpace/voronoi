@@ -4237,7 +4237,7 @@ window.Raphael.svg && function (R) {
                             } else {
                                 $(node, {fill: value});
                                 o.pattern = document.getElementById(isRef[1]);
-                                o.pattern && updatePosition(o);
+                                // o.pattern && updatePosition(o);
                             }
                             break;
                         }
