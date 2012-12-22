@@ -206,15 +206,19 @@
                 site.y > this.paper._top &&
                 site.y < this.paper._top + this.paper.height
               ) {
-                fill_template = this.options.items[ index - 1 ].bg;
-                var path = this.setPath( points, this.sites[i], this.paths[ i ], "url(#" + fill_template + ")" );
-                path.attr( 'href', this.options.items[ index - 1 ].href );
+                var item_opts = this.options.items[ index - 1 ];
+                    fill_template = item_opts.bg,
+                    path = this._setPath( points, this.sites[i], this.paths[ i ], "url(#" + fill_template + ")" );
+                
+                path.attr( 'href', item_opts.href );
+                
                 this.paths[ i ] = path;
-                this.sites[ i ].path = path;
-                this.sites[ i ].points = points;
-                this.sites[ i ].title = this.options.items[ index - 1 ].title;
-                this.sites[ i ].signature = this.options.items[ index - 1 ].descr;
-                this.sites[ i ].fill_template = fill_template;
+                site.path = path;
+                site.points = points;
+                site.title = item_opts.title;
+                site.signature = item_opts.descr;
+                site.fill_template = fill_template;
+                site.href = item_opts.href;
                 index++;
               }
             }
@@ -293,12 +297,10 @@
       
       if ( is_empty( this.cursor_path_text ) ) {
         this.cursor_path_text = this.paper.text( 0, 0, "" ).attr( this.options.attrs.text );
-        console.log( this.cursor_path_text )
       }
       
       if ( is_empty( this.cursor_path_title ) ) {
         this.cursor_path_title = this.paper.text( 0, 0, "" ).attr( this.options.attrs.title );
-        console.log( this.cursor_path_title )
       }
       
       var left_x = this.paper._left,
@@ -364,7 +366,7 @@
         bottom_path_bbox = Raphael.pathBBox( ExPath.Util.roundabout( bottom_path_points ).getPathDSL() );
       
       if ( ( top_path_points.length > 2 ) && !is_empty( top_path_bbox ) ) {
-        top_path_points = this.rejectShortDist( this._sortPoints(
+        top_path_points = this._rejectShortDist( this._sortPoints(
           top_path_points,
           { x: top_path_bbox.x + top_path_bbox.width / 2, y: top_path_bbox.y + top_path_bbox.height / 2 }
         ), 2 );
@@ -373,7 +375,7 @@
       this.top_sub_path.attr( { path: top_path_dsl, fill: "url(#" + this.closest_site.fill_template + ")" } ).toFront();
       
       if ( ( bottom_path_points.length > 2 ) && !is_empty( bottom_path_bbox ) ) {
-        bottom_path_points = this.rejectShortDist( this._sortPoints(
+        bottom_path_points = this._rejectShortDist( this._sortPoints(
           bottom_path_points,
           { x: bottom_path_bbox.x + bottom_path_bbox.width / 2, y: bottom_path_bbox.y + bottom_path_bbox.height / 2 }
         ), 2 );
@@ -382,7 +384,7 @@
       
       this.bottom_sub_path.attr( { path: bottom_path_dsl, fill: "url(#" + this.closest_site.fill_template + ")" } ).toFront();
       
-      point_set = this.rejectShortDist( this._sortPoints( point_set, { x: this.closest_site.x, y: this.closest_site.y } ), 5 );
+      point_set = this._rejectShortDist( this._sortPoints( point_set, { x: this.closest_site.x, y: this.closest_site.y } ), 5 );
       
       point_set.each( function( point ) {
         if ( !cursor_expath.isStarted() ) {
@@ -418,6 +420,11 @@
       
       this.cursor_path_text.attr( { text: signature, x: pos.x, y: pos.y + 15 } );
       this.cursor_path_title.attr( { text: title, x: pos.x, y: pos.y - 15 } );
+      
+      [ this.cursor_path_text, this.cursor_path_title, this.cursor_path ].each( function( el ) {
+        el.attr( 'href', self.closest_site.href );
+      } )
+      
     },
     
     _addPattern: function( img_src, id ) {
@@ -425,7 +432,7 @@
           canvas = this.paper.canvas,
           doc = canvas.ownerDocument,
           namespaceUri = canvas.namespaceURI,
-          defs =this.paper.defs,
+          defs = this.paper.defs,
           el = this._$("pattern"),
           ig = this._$("image");
           el.id = id;
@@ -453,21 +460,21 @@
         if (typeof el == "string") {
           el = this._$(el);
         }
-        for (var key in attr) if (attr.hasOwnProperty(key)) {
-          if (key.substring(0, 6) == "xlink:") {
-            el.setAttributeNS(xlink, key.substring(6), String(attr[key]));
+        for ( var key in attr ) if (attr.hasOwnProperty( key ) ) {
+          if ( key.substring( 0, 6 ) == "xlink:" ) {
+            el.setAttributeNS( xlink, key.substring( 6 ), String( attr[ key ] ) );
           } else {
-            el.setAttribute(key, String(attr[key]));
+            el.setAttribute( key, String( attr[ key ] ) );
           }
         }
       } else {
         el = Raphael._g.doc.createElementNS( "http://www.w3.org/2000/svg", el );
-        el.style && (el.style.webkitTapHighlightColor = "rgba(0,0,0,0)");
+        el.style && ( el.style.webkitTapHighlightColor = "rgba(0,0,0,0)" );
       }
       return el;
     },
     
-    rejectShortDist: function( sorted_points, min_dist ) {
+    _rejectShortDist: function( sorted_points, min_dist ) {
       var res = [],
           prev_point,
           sqMinDist = Math.pow( min_dist, 2 ),
@@ -475,7 +482,7 @@
       
       sorted_points.each( function( point ) {
         if ( !is_empty( prev_point ) ) {
-          if ( sqMinDist <= self.sqDistanceBetween( point, prev_point ) ) {
+          if ( sqMinDist <= self._sqDistanceBetween( point, prev_point ) ) {
             res.push( point );
           }
         } else {
@@ -487,11 +494,11 @@
       return res;
     },
     
-    sqDistanceBetween: function( p1, p2 ) {
+    _sqDistanceBetween: function( p1, p2 ) {
       return Math.pow( p1.x - p2.x, 2 ) + Math.pow( p1.y - p2.y, 2 );
     },
     
-    setPath: function( points, site, current_path, fill_template ) {
+    _setPath: function( points, site, current_path, fill_template ) {
     	var path,
     	    ex_p = ExPath.Util.roundaboutMiddle( points ),
           path_dsl;
