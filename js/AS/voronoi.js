@@ -418,8 +418,8 @@
         pos = { x: 0, y: 0 };
       }
       
-      this.cursor_path_text.attr( { text: signature, x: pos.x, y: pos.y + 15 } );
-      this.cursor_path_title.attr( { text: title, x: pos.x, y: pos.y - 15 } );
+      this.cursor_path_text.attr( { text: signature, x: pos.x, y: pos.y + 15 } ).toFront();
+      this.cursor_path_title.attr( { text: title, x: pos.x, y: pos.y - 15 } ).toFront();
       
       [ this.cursor_path_text, this.cursor_path_title, this.cursor_path ].each( function( el ) {
         el.attr( 'href', self.closest_site.href );
