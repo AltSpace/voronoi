@@ -4,9 +4,11 @@
     <meta http-equiv="Content-type" content="text/html; charset=utf-8">
     <title>Voronoy diagrams</title>
     <!-- Here is patched raphael version! -->
+    <script type="text/javascript" charset="utf-8" src="js/mt.js"></script>
     <script type="text/javascript" charset="utf-8" src="js/raphael.max.js"></script>
     <script type="text/javascript" charset="utf-8" src="js/ex_path.js"></script>
-    <script type="text/javascript" charset="utf-8" src="js/voronoy.js"></script>
+    <script type="text/javascript" charset="utf-8" src="js/vvoronoi.js"></script>
+    <script type="text/javascript" charset="utf-8" src="js/AS/voronoi.js"></script>
     <style type="text/css" media="screen">
       body, body * {
         margin: 0;
@@ -25,499 +27,104 @@
       
       (function() {
         
-        var CURSOR_ZONE_HEIGHT = 120,
-            CURSOR_ZONE_ERROR = 5,
-            IS_DEBUG = false;
+        var projects = [
+          {
+            title: "Видео",
+            descr: "Ролики и инфографика\nдля Роснефти",
+            bg: "img/1.jpg",
+            href: "#asd"
+          },
+          {
+            title: "Видео",
+            descr: "Ролики и инфографика\nдля Роснефти",
+            bg: "img/2.jpg",
+            href: "#asd"
+          },
+          {
+            title: "Видео",
+            descr: "Ролики и инфографика\nдля Роснефти",
+            bg: "img/3.jpg",
+            href: "#asd"
+          },
+          {
+            title: "Видео",
+            descr: "Ролики и инфографика\nдля Роснефти",
+            bg: "img/4.jpg",
+            href: "#asd"
+          },
+          {
+            title: "Видео",
+            descr: "Ролики и инфографика\nдля Роснефти",
+            bg: "img/5.jpg",
+            href: "#asd"
+          },
+          {
+            title: "Видео",
+            descr: "Ролики и инфографика\nдля Роснефти",
+            bg: "img/6.jpg",
+            href: "#asd"
+          },
+          {
+            title: "Видео",
+            descr: "Ролики и инфографика\nдля Роснефти",
+            bg: "img/7.jpg",
+            href: "#asd"
+          },
+          {
+            title: "Видео",
+            descr: "Ролики и инфографика\nдля Роснефти",
+            bg: "img/8.jpg",
+            href: "#asd"
+          },
+          {
+            title: "Видео",
+            descr: "Ролики и инфографика\nдля Роснефти",
+            bg: "img/9.jpg",
+            href: "#asd"
+          },
+          {
+            title: "Видео",
+            descr: "Ролики и инфографика\nдля Роснефти",
+            bg: "img/10.jpg",
+            href: "#asd"
+          },
+          {
+            title: "Видео",
+            descr: "Ролики и инфографика\nдля Роснефти",
+            bg: "img/11.jpg",
+            href: "#asd"
+          },
+          {
+            title: "Видео",
+            descr: "Ролики и инфографика\nдля Роснефти",
+            bg: "img/12.jpg",
+            href: "#asd"
+          },
+          {
+            title: "Видео",
+            descr: "Ролики и инфографика\nдля Роснефти",
+            bg: "img/13.jpg",
+            href: "#asd"
+          },
+          {
+            title: "Видео",
+            descr: "Ролики и инфографика\nдля Роснефти",
+            bg: "img/14.jpg",
+            href: "#asd"
+          },
+        ];
         
-        var paper,
-            sites,
-            bbox,
-            voronoi,
-            paths,
-            last_mouse_pos,
-            bg_data,
-            closest_center_line,
-            closest_site,
-            cursor_path,
-            cursor_path_text,
-            top_sub_path,
-            bottom_sub_path,
-            signatures = [
-              "A fool thinks himself to be wise,\nbut a wise man knows himself\nto be a fool",
-              "Be not afraid of greatness:\nsome are born great,\nsome achieve greatness, and some\nhave greatness thrust upon them.",
-              "Love all, trust a few,\ndo wrong to none.",
-              "Expectation is the root\nof all heartache.",
-              "It is not in the stars to hold\nour destiny but in ourselves.",
-              "If music be the food of love,\nplay on.",
-              "Hell is empty and all\nthe devils are here.",
-              "Better a witty fool\nthan a foolish wit.",
-              "The evil that men do lives after them;\nthe good is oft interred with their bones.",
-              "The wheel is come full circle.",
-              "It is not in the stars to hold\nour destiny but in ourselves.",
-              "God has given you one face,\nand you make yourself another."
-            ];
         
-        document.addEventListener( "DOMContentLoaded", initialize, false );
-        
-        window.addEventListener( "resize", function() {
-          resetPaper();
-          redraw();
+        document.addEventListener( "DOMContentLoaded", function() {
+          AS.Voronoi.bang( {
+            paper: "paper",
+            items: projects,
+            viewbox: {
+              cols: 4
+            }
+          } );
         }, false );
         
-        window.addEventListener( "mousemove", function( e ) {
-          var x = e.x || e.clientX,
-              y = e.y || e.clientY;
-          last_mouse_pos = { x: x, y: y };
-          getClosestPath( last_mouse_pos );
-          redrawCursorPath( last_mouse_pos );
-        }, false );
-        
-        function is_empty( subj ) {
-          return subj === undefined || subj === null;
-        }
-        
-        function each( arr, cb ) {
-          for ( var i in arr ) {
-            ( function( ix ) {
-              cb( arr[ ix ], ix );
-            } )( i );
-          }
-        }
-        
-        function resetPaper() {
-          paper.setSize( window.innerWidth, window.innerHeight );
-          bbox = {
-        		xl: 0,
-        		xr: paper.width,
-        		yt: 0,
-        		yb: paper.height
-        	};
-          sites = generateBeeHivePoints( { x: 4.0, y: 3.0 }, true );
-        }
-        
-        function initialize() {
-          
-          paper = Raphael(
-            "paper",
-            window.innerWidth,
-            window.innerHeight
-          );
-          
-          paths = [];
-          
-          resetPaper();
-          
-          addPattern( "img/vw.jpg", "template1" );
-          addPattern( "img/1.jpg", "template2" );
-          addPattern( "img/3.png", "template3" );
-          addPattern( "img/ipad_1.png", "template4" );
-          addPattern( "img/s4.jpg", "template5" );
-          addPattern( "img/w1.jpg", "template6" );
-          addPattern( "img/w3.jpg", "template7" );
-          addPattern( "img/w5.jpg", "template8" );
-          addPattern( "img/w6.jpg", "template9" );
-          addPattern( "img/w7.jpg", "template10" );
-          addPattern( "img/w8.jpg", "template11" );
-          addPattern( "img/w9.jpg", "template12" );
-          
-          voronoi = new Voronoi();
-          
-          last_mouse_pos = { x: paper.width / 2, y: paper.height / 2 };
-          
-          redraw();
-        }
-      
-        function redraw() {
-          draw();
-        }
-        
-        var xlink = "http://www.w3.org/1999/xlink",
-        
-        $ = function (el, attr) {
-            if (attr) {
-                if (typeof el == "string") {
-                    el = $(el);
-                }
-                for (var key in attr) if (attr.hasOwnProperty(key)) {
-                    if (key.substring(0, 6) == "xlink:") {
-                        el.setAttributeNS(xlink, key.substring(6), String(attr[key]));
-                    } else {
-                        el.setAttribute(key, String(attr[key]));
-                    }
-                }
-            } else {
-                el = Raphael._g.doc.createElementNS("http://www.w3.org/2000/svg", el);
-                el.style && (el.style.webkitTapHighlightColor = "rgba(0,0,0,0)");
-            }
-            return el;
-        }
-        
-        
-        function addPattern( img_src, id ) {
-          var canvas = paper.canvas,
-              doc = canvas.ownerDocument,
-              namespaceUri = canvas.namespaceURI,
-              defs = paper.defs,
-              el = $("pattern"),
-              ig = $("image");
-              el.id = id;
-              $(el, {x: 0, y: 0, patternUnits: "userSpaceOnUse", height: 1, width: 1});
-              $(ig, {x: 0, y: 0, "xlink:href": img_src});
-              el.appendChild( ig );
-          
-          (function (el) {
-              Raphael._preload(img_src, function () {
-                  var w = this.offsetWidth,
-                      h = this.offsetHeight;
-                  $(el, {width: w, height: h});
-                  $(ig, {width: w, height: h});
-              });
-          })(el);
-          
-          defs.appendChild( el );
-          
-          return el.id;
-        }
-        
-        function getClosestPath( cursor_pos ) {
-          var closest_distance;
-          // определение ближайшей к курсору мышки ячейки
-      	  for ( var i = 0; i < sites.length; i++ ) {
-      	    var site = sites[ i ];
-      	    if (
-              site.x > paper._left &&
-              site.x < paper._left + paper.width &&
-              site.y > paper._top &&
-              site.y < paper._top + paper.height
-            ) {
-              if ( cursor_pos !== null && i != ( sites.length - 1 ) ) {
-                var pointer_distance = Math.pow( cursor_pos.x - site.x, 2 ) +
-                                       Math.pow( cursor_pos.y - site.y, 2 );
-                if ( undefined === closest_distance ||
-                      pointer_distance < closest_distance ) {
-                  closest_distance = pointer_distance;
-                  closest_site = site;
-                }
-              }
-            }
-      	  }
-      	  
-      	  return closest_site;
-        }
-        
-        function draw() {
-          
-          var diagram = voronoi.compute(sites, bbox);
-          
-        	if (diagram) {
-        	  var current_ids = [],
-        	      last_path,
-        	      index = 1;
-        	  
-        	  for ( var i = 0, l = sites.length; i < l; i++ ) {
-              var cell = diagram.cells[ sites[i].voronoiId ],
-                ix = current_ids.indexOf( sites[i].voronoiId );
-              if ( ix !== -1 ) {
-                current_ids.splice( ix, 1 );
-              }
-              
-              if ( cell ) {
-                var halfedges = cell.halfedges,
-                    fill_template = "",
-                    site = sites[ i ];
-                var length = halfedges.length
-                    
-                if ( length > 2 ) {
-                  var points = [];
-                  for (var j = 0; j < length; j++) {
-                    v = halfedges[j].getEndpoint();
-                    points.push( v );
-                  }
-                  
-                  if (
-                    site.x > paper._left &&
-                    site.x < paper._left + paper.width &&
-                    site.y > paper._top &&
-                    site.y < paper._top + paper.height
-                  ) {
-                    fill_template = "template" + ( index );
-                    var path = setPath( points, sites[i], paths[ i ], fill_template );
-                    paths[ i ] = path;
-                    site.path = path;
-                    site.points = points;
-                    site.signature = signatures[ index - 1 ];
-                    site.fill_template = fill_template;
-                    index++;
-                  }
-                }
-              }
-            }
-            getClosestPath( last_mouse_pos );
-            redrawCursorPath( last_mouse_pos );
-          }
-        }
-        
-        function sortPoints( points, relate_to ) {
-          // просчитываем углы для каждой точки
-          // относительно центра зоны
-          // сортируем по углу наклона
-          var polars = [],
-              res = [];
-          each( points, function( point ) {
-            var vector = { x: relate_to.x - point.x, y: relate_to.y - point.y };
-            angle = decartToAngle( vector );
-            polars.push( { angle: angle, point: point } );
-          } );
-          
-          polars.sort( function( p1, p2 ) { return p1.angle - p2.angle } );
-          
-          each( polars, function( polar ) {
-            res.push( polar.point );
-          } );
-          
-          return res;
-        }
-        
-        function decartToAngle( vector ) {
-          var x = vector.x,
-              y = vector.y,
-              pi = Math.PI;
-          if ( x == 0 ) {
-            return ( y > 0 ) ? pi / 2 : -1 * pi / 2;
-          }
-          var atg = Math.atan( y / x );
-          atg += ( x > 0 ) ? ( ( y > 0 ) ? 0 : 2 * pi ) : pi;
-          
-          return atg;
-        }
-        
-        var debug_points;
-        
-        function redrawCursorPath( mouse_pos ) {
-          
-          var closest_path = closest_site.path.attr( 'path' );
-          
-          if ( is_empty( closest_site ) ) {
-            return;
-          }
-          
-          if ( is_empty( cursor_path ) ) {
-            cursor_path = paper.path();
-            cursor_path.attr( { fill: "#000", stroke: "#000", "stroke-width": 10 } );
-          }
-          
-          if ( is_empty( cursor_path_text ) ) {
-            cursor_path_text = paper.text( 0, 0, "" ).attr( { fill: "#FFF", "font-size": 16 } );
-          }
-          
-          var left_x = paper._left,
-              right_x = paper._left + paper.width,
-              y = mouse_pos.y,
-              top_y = y - CURSOR_ZONE_HEIGHT / 2,
-              bottom_y = y + CURSOR_ZONE_HEIGHT / 2;
-          
-          var top_line_path = (new ExPath()).moveTo( left_x, top_y ).lineTo( right_x, top_y ).getPathDSL(),
-              bottom_line_path = (new ExPath()).moveTo( left_x, bottom_y ).lineTo( right_x, bottom_y ).getPathDSL(),
-              top_intersections = Raphael.pathIntersection(
-                top_line_path,
-                closest_path
-              ),
-              bottom_intersections = Raphael.pathIntersection(
-                bottom_line_path,
-                closest_path
-              );
-          
-          // counter clockwise iterator
-          var point_set = [],
-              point_set_external = closest_site.points;
-          
-          each( closest_site.points, function( point ) {
-            if ( ( point.y >= top_y - CURSOR_ZONE_ERROR || !top_intersections.length ) &&
-              ( point.y <= bottom_y + CURSOR_ZONE_ERROR || !bottom_intersections.length ) ) {
-              point_set.push( { x: point.x, y: point.y } );
-            }
-          } );
-          
-          point_set = point_set.concat( top_intersections ).concat( bottom_intersections );
-          
-          point_set_external = point_set_external.concat( top_intersections ).concat( bottom_intersections );
-          
-          var cursor_expath = new ExPath();
-          
-          if ( is_empty( top_sub_path ) ) {
-            top_sub_path = paper.path().attr( { fill: "#FFF", stroke: "#000", "stroke-width": 10 } );
-          }
-          if ( is_empty( bottom_sub_path ) ) {
-            bottom_sub_path = paper.path().attr( { fill: "#FFF", stroke: "#000", "stroke-width": 10 } );
-          }
-          
-          var top_path_points = [],
-              bottom_path_points = [];
-          
-          each( point_set_external, function( point ) {
-            if ( point.y <= top_y + CURSOR_ZONE_ERROR ) {
-              top_path_points.push( { x: point.x, y: point.y } );
-            } else if ( point.y >= bottom_y - CURSOR_ZONE_ERROR ) {
-              bottom_path_points.push( { x: point.x, y: point.y } );
-            }
-          } );
-          
-          var top_path_bbox, bottom_path_bbox,
-              top_path_dsl = "", bottom_path_dsl = "";
-          
-          
-          if ( IS_DEBUG ) {
-            if ( !is_empty( debug_points ) ) {
-              debug_points.remove();
-              debug_points = null;
-            }
-            debug_points = paper.set();
-            var ix = 0;
-            each( bottom_path_points, function( point ) {
-              debug_points.push(
-                paper.circle( point.x, point.y, 10 ).attr( { fill: "#00F" } ).toFront(),
-                paper.text( point.x, point.y, "" + ix++ )
-              );
-            } );
-            each( top_path_points, function( point ) {
-              debug_points.push(
-                paper.circle( point.x, point.y, 10 ).attr( { fill: "#0F0" } ).toFront(),
-                paper.text( point.x, point.y, "" + ix++ )
-              );
-            } )
-          }
-          
-          
-          if ( top_path_points.length > 2 )
-            top_path_bbox = Raphael.pathBBox( ExPath.Util.roundabout( top_path_points ).getPathDSL() );
-          if ( bottom_path_points.length > 2 )
-            bottom_path_bbox = Raphael.pathBBox( ExPath.Util.roundabout( bottom_path_points ).getPathDSL() );
-          
-          if ( ( top_path_points.length > 2 ) && !is_empty( top_path_bbox ) ) {
-            top_path_points = rejectShortDist( sortPoints(
-              top_path_points,
-              { x: top_path_bbox.x + top_path_bbox.width / 2, y: top_path_bbox.y + top_path_bbox.height / 2 }
-            ), 2 );
-            top_path_dsl = ExPath.Util.roundaboutMiddle( top_path_points ).getPathDSL();
-          }
-          top_sub_path.attr( { path: top_path_dsl, fill: "url(#" + closest_site.fill_template + ")" } ).toFront();
-          
-          if ( ( bottom_path_points.length > 2 ) && !is_empty( bottom_path_bbox ) ) {
-            bottom_path_points = rejectShortDist( sortPoints(
-              bottom_path_points,
-              { x: bottom_path_bbox.x + bottom_path_bbox.width / 2, y: bottom_path_bbox.y + bottom_path_bbox.height / 2 }
-            ), 2 );
-            bottom_path_dsl = ExPath.Util.roundaboutMiddle( bottom_path_points ).getPathDSL();
-          }
-          
-          bottom_sub_path.attr( { path: bottom_path_dsl, fill: "url(#" + closest_site.fill_template + ")" } ).toFront();
-          
-          point_set = rejectShortDist( sortPoints( point_set, { x: closest_site.x, y: closest_site.y } ), 5 );
-          
-          each( point_set, function( point ) {
-            if ( !cursor_expath.isStarted() ) {
-              cursor_expath.moveTo(
-                Math.round( point.x ),
-                Math.round( point.y )
-              );
-            } else {
-              cursor_expath.lineTo(
-                Math.round( point.x ),
-                Math.round( point.y )
-              );
-            }
-          } );
-          cursor_expath.close();
-          
-          cursor_path.attr( { path: closest_site.path.attr( "path" ) } );
-          
-          var signature,
-              pos,
-              bbox;
-          if ( !is_empty( closest_site.signature ) ) {
-            signature = closest_site.signature;
-            bbox = Raphael.pathBBox( cursor_expath.getPathDSL() );
-            pos = { x: bbox.x + bbox.width / 2, y: bbox.y + bbox.height / 2 };
-          } else {
-            signature = "";
-            pos = { x: 0, y: 0 };
-          }
-          
-          cursor_path_text.attr( { text: signature, x: pos.x, y: pos.y } );
-        }
-        
-        function rejectShortDist( sorted_points, min_dist ) {
-          
-          var res = [],
-              prev_point,
-              sqMinDist = Math.pow( min_dist, 2 );
-          
-          each( sorted_points, function( point ) {
-            if ( !is_empty( prev_point ) ) {
-              if ( sqMinDist <= sqDistanceBetween( point, prev_point ) ) {
-                res.push( point );
-              }
-            } else {
-              res.push( point );
-            }
-            prev_point = point;
-          } );
-          
-          return res;
-        }
-        
-        function sqDistanceBetween( p1, p2 ) {
-          return Math.pow( p1.x - p2.x, 2 ) + Math.pow( p1.y - p2.y, 2 );
-        }
-        
-        function setPath( points, site, current_path, fill_template ) {
-        	
-        	var path,
-        	    ex_p = ExPath.Util.roundaboutMiddle( points ),
-              path_dsl;
-          
-          if ( is_empty( ex_p ) ) {
-            return;
-          }
-          
-          path_dsl = ex_p.getPathDSL();
-          
-          if ( current_path !== undefined && current_path !== null ) {
-            path = current_path;
-            path.animate( { path: path_dsl }, 600, "<>", function() {} );
-          } else {
-            path = paper.path( path_dsl );
-            path.attr( "stroke", "#000" );
-            path.attr( "stroke-width", 10 );
-            path.attr( "fill", "url(#" + fill_template + ")" );
-          }
-          
-          return path;
-        }
-
-
-
-        function generateBeeHivePoints( size, loose ) {
-        	var points = [];
-        	var col = { x: paper.width / size.x, y: paper.height / size.y };
-        	for(var i = -1; i < size.x + 1; i++) {
-        		for(var j = -1; j < size.y + 1; j++) {
-        			var point = {
-        			  x: ( i / size.x * paper.width + col.x / 2 ),
-        			  y: ( j / size.y * paper.height + col.y / 2 )
-        			}
-        			if ( j % 2 ) {
-        				point.x += col.x / 2;
-        			}
-        			if ( loose ) {
-        				point.x += col.x / 4 * ( Math.random() - 1 );
-        				point.y += col.y / 4 * ( Math.random() - 1 );
-        			}
-        			points.push( point );
-        		}
-        	}
-        	return points;
-        }
       })();
     </script>
   </body>
