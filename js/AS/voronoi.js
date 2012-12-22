@@ -20,7 +20,8 @@
       },
       attrs: {
         path: { fill: "#000", stroke: "#000", "stroke-width": 15 },
-        text: { fill: "#FFF", "font-size": 16 }
+        text: { fill: "#FFF", "font-size": 16 },
+        title: { fill: "#C0C0C0", "font-size": 14 }
       }
     },
     
@@ -35,11 +36,13 @@
         self._bindMouse();
         self._bindResize();
         self.draw();
+        self._fixBGTransforms();
       } );
       this.addEvent( 'paper.resized', function() {
         self.closest_site = self._getClosestSite( self.last_mouse_pos );
         self.sites = self._generateBeeHivePoints( this._getDim(), true );
         self.draw();
+        self._fixBGTransforms();
       } );
       this._initPaper();
     },
@@ -209,13 +212,9 @@
                 this.paths[ i ] = path;
                 this.sites[ i ].path = path;
                 this.sites[ i ].points = points;
+                this.sites[ i ].title = this.options.items[ index - 1 ].title;
                 this.sites[ i ].signature = this.options.items[ index - 1 ].descr;
                 this.sites[ i ].fill_template = fill_template;
-                
-                var bbox = path.getBBox( 1 ),
-                    pattern = path.pattern;
-                this._$( pattern, { patternTransform: "matrix(1,0,0,1,0,0) translate(" + bbox.x + "," + bbox.y + ")" } );
-                
                 index++;
               }
             }
@@ -227,7 +226,19 @@
       }
     },
     
-    sortPoints: function( points, relate_to ) {
+    _fixBGTransforms: function() {
+      for ( var i = 0, l = this.sites.length; i < l; i++ ) {
+        var site = this.sites[ i ],
+            path = site.path;
+        if ( !is_empty( path ) ) {
+          var bbox = path.getBBox( 1 ),
+              pattern = path.pattern;
+          this._$( pattern, { patternTransform: "matrix(1,0,0,1,0,0) translate(" + bbox.x + "," + bbox.y + ")" } );
+        }
+      }
+    },
+    
+    _sortPoints: function( points, relate_to ) {
       // просчитываем углы для каждой точки
       // относительно центра зоны
       // сортируем по углу наклона
@@ -282,6 +293,12 @@
       
       if ( is_empty( this.cursor_path_text ) ) {
         this.cursor_path_text = this.paper.text( 0, 0, "" ).attr( this.options.attrs.text );
+        console.log( this.cursor_path_text )
+      }
+      
+      if ( is_empty( this.cursor_path_title ) ) {
+        this.cursor_path_title = this.paper.text( 0, 0, "" ).attr( this.options.attrs.title );
+        console.log( this.cursor_path_title )
       }
       
       var left_x = this.paper._left,
@@ -347,7 +364,7 @@
         bottom_path_bbox = Raphael.pathBBox( ExPath.Util.roundabout( bottom_path_points ).getPathDSL() );
       
       if ( ( top_path_points.length > 2 ) && !is_empty( top_path_bbox ) ) {
-        top_path_points = this.rejectShortDist( this.sortPoints(
+        top_path_points = this.rejectShortDist( this._sortPoints(
           top_path_points,
           { x: top_path_bbox.x + top_path_bbox.width / 2, y: top_path_bbox.y + top_path_bbox.height / 2 }
         ), 2 );
@@ -356,7 +373,7 @@
       this.top_sub_path.attr( { path: top_path_dsl, fill: "url(#" + this.closest_site.fill_template + ")" } ).toFront();
       
       if ( ( bottom_path_points.length > 2 ) && !is_empty( bottom_path_bbox ) ) {
-        bottom_path_points = this.rejectShortDist( this.sortPoints(
+        bottom_path_points = this.rejectShortDist( this._sortPoints(
           bottom_path_points,
           { x: bottom_path_bbox.x + bottom_path_bbox.width / 2, y: bottom_path_bbox.y + bottom_path_bbox.height / 2 }
         ), 2 );
@@ -365,7 +382,7 @@
       
       this.bottom_sub_path.attr( { path: bottom_path_dsl, fill: "url(#" + this.closest_site.fill_template + ")" } ).toFront();
       
-      point_set = this.rejectShortDist( this.sortPoints( point_set, { x: this.closest_site.x, y: this.closest_site.y } ), 5 );
+      point_set = this.rejectShortDist( this._sortPoints( point_set, { x: this.closest_site.x, y: this.closest_site.y } ), 5 );
       
       point_set.each( function( point ) {
         if ( !cursor_expath.isStarted() ) {
@@ -385,18 +402,22 @@
       this.cursor_path.attr( { path: this.closest_site.path.attr( "path" ) } );
       
       var signature,
+          title,
           pos,
           bbox;
       if ( !is_empty( this.closest_site.signature ) ) {
+        title = this.closest_site.title;
         signature = this.closest_site.signature;
         bbox = Raphael.pathBBox( cursor_expath.getPathDSL() );
         pos = { x: bbox.x + bbox.width / 2, y: bbox.y + bbox.height / 2 };
       } else {
+        title = "";
         signature = "";
         pos = { x: 0, y: 0 };
       }
       
-      this.cursor_path_text.attr( { text: signature, x: pos.x, y: pos.y } );
+      this.cursor_path_text.attr( { text: signature, x: pos.x, y: pos.y + 15 } );
+      this.cursor_path_title.attr( { text: title, x: pos.x, y: pos.y - 15 } );
     },
     
     _addPattern: function( img_src, id ) {
